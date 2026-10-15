@@ -1,0 +1,19 @@
+{
+  "name": "diff-review",
+  "version": "1.0.0",
+  "description": "Review every file change Claude Code makes as a diff, comment line-by-line, and send feedback back to Claude to implement.",
+  "author": {
+    "name": "rubymatrix",
+    "url": "https://github.com/rubymatrix"
+  },
+  "homepage": "https://github.com/rubymatrix/claude-diff-review",
+  "repository": "https://github.com/rubymatrix/claude-diff-review",
+  "license": "MIT",
+  "keywords": [
+    "review",
+    "diff",
+    "code-review",
+    "hooks",
+    "feedback"
+  ]
+}
