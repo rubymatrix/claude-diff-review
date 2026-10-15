@@ -1,0 +1,13 @@
+{
+  "name": "claude-diff-review",
+  "owner": { "name": "rubymatrix", "url": "https://github.com/rubymatrix" },
+  "metadata": { "description": "Differential review UI for every change Claude Code makes, with feedback sent straight back to Claude." },
+  "plugins": [
+    {
+      "name": "diff-review",
+      "source": "./plugins/diff-review",
+      "description": "Review every file change Claude Code makes as a diff, comment line-by-line, and send feedback back to Claude to implement.",
+      "version": "1.0.0"
+    }
+  ]
+}
