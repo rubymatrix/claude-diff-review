@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Diff Review</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%23c96442%22/%3E%3Cpath d=%22M4 5h8M4 8h5M4 11h7%22 stroke=%22white%22 stroke-width=%221.6%22/%3E%3C/svg%3E">
+<style>
+:root{
+  --bg:#f6f7f9;--panel:#fff;--panel2:#f0f2f5;--line:#dfe3e8;--text:#1d232b;--muted:#68717d;--accent:#c96442;--accent-ink:#fff;
+  --add-bg:#e7f6ec;--add-hl:#b6e6c4;--add-ln:#d2efdb;--del-bg:#fdecec;--del-hl:#f6c2c2;--del-ln:#f8dada;--gap:#eef1f5;
+  --ok:#1f8a4c;--warn:#b7791f;--bad:#c53030;--info:#2b6cb0;--shadow:0 1px 2px rgba(0,0,0,.05),0 2px 8px rgba(0,0,0,.04);
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#14161a;--panel:#1b1e23;--panel2:#22262c;--line:#2e333a;--text:#e3e6ea;--muted:#959ca6;--accent:#e07a55;--accent-ink:#111;
+  --add-bg:#13261b;--add-hl:#1f5133;--add-ln:#183223;--del-bg:#2c1717;--del-hl:#6a2626;--del-ln:#391c1c;--gap:#1f2329;
+  --ok:#48bb78;--warn:#ecc94b;--bad:#fc8181;--info:#63b3ed;--shadow:none;}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+button,select,textarea,input{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--panel);border-radius:6px;padding:4px 10px}
+button:hover{border-color:var(--muted)}
+a{color:var(--info)}
+select{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:3px 6px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+button:disabled{opacity:.5;cursor:default}
+textarea{width:100%;border:1px solid var(--line);border-radius:6px;background:var(--panel);padding:8px;resize:vertical}
+textarea:focus{outline:2px solid var(--accent);outline-offset:-1px}
+code,.mono{font-family:var(--mono);font-size:12.5px}
+.muted{color:var(--muted)}
+header{height:52px;display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:15px;margin:0;white-space:nowrap}
+header .sp{flex:1}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:999px;font-size:12px;border:1px solid var(--line);white-space:nowrap}
+.pill.waiting{border-color:var(--accent);color:var(--accent);animation:pulse 1.6s infinite}
+.pill.working{color:var(--info);border-color:var(--info)}
+@keyframes pulse{50%{opacity:.45}}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.on{background:var(--ok)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:4px 10px}
+.seg button.on{background:var(--panel2);font-weight:600}
+.toggle{display:flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap;cursor:pointer}
+.layout{display:grid;grid-template-columns:290px minmax(0,1fr) 370px;height:calc(100% - 52px)}
+aside,.composer{overflow:auto;background:var(--panel);border-right:1px solid var(--line)}
+.composer{border-right:0;border-left:1px solid var(--line);display:flex;flex-direction:column}
+main{overflow:auto;padding:16px 20px 80px}
+.sec{padding:12px 14px;border-bottom:1px solid var(--line)}
+.sec h2{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px;display:flex;justify-content:space-between}
+.sess{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:4px}
+.sess:hover{background:var(--panel2)}
+.sess.on{border-color:var(--accent);background:var(--panel2)}
+.sess .t{font-weight:600;display:flex;justify-content:space-between;gap:6px}
+.sess .p{font-family:var(--mono);font-size:11px;color:var(--muted);word-break:break-all}
+.file{display:flex;gap:8px;align-items:flex-start;padding:5px 8px;border-radius:6px;cursor:pointer;font-family:var(--mono);font-size:11.5px;word-break:break-all}
+.file:hover{background:var(--panel2)}
+.file.on{background:var(--panel2);outline:1px solid var(--accent)}
+.file .n{margin-left:auto;white-space:nowrap;color:var(--muted)}
+.st-dot{width:8px;height:8px;border-radius:2px;margin-top:4px;flex:none;background:var(--line)}
+.st-approved{background:var(--ok)}.st-rejected{background:var(--bad)}.st-needs-work{background:var(--warn)}
+.tabs{display:flex;gap:6px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.tabs .tab{border-radius:999px}
+.tabs .tab.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+.chip{display:inline-flex;gap:6px;align-items:center;background:var(--panel2);border:1px solid var(--line);border-radius:999px;padding:2px 4px 2px 10px;font-family:var(--mono);font-size:11.5px;max-width:100%}
+.chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip button{border:0;padding:0 6px;background:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:16px;box-shadow:var(--shadow);overflow:hidden;min-height:60px}
+.card.focus{outline:2px solid var(--accent)}
+.card.v-approved{border-left:4px solid var(--ok)}.card.v-rejected{border-left:4px solid var(--bad)}.card.v-needs-work{border-left:4px solid var(--warn)}
+.card-h{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel2);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.seq{font-weight:700;color:var(--muted)}
+.tool{font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;background:var(--line)}
+.tool.Bash{background:#6b46c1;color:#fff}.tool.Write{background:#2b6cb0;color:#fff}.tool.Edit,.tool.MultiEdit{background:#2f855a;color:#fff}.tool.NotebookEdit{background:#b7791f;color:#fff}
+.path{font-family:var(--mono);font-size:12.5px;word-break:break-all;flex:1;min-width:200px}
+.path .dir{color:var(--muted)}
+.path b{font-weight:700}
+.stat{font-family:var(--mono);font-size:12px;white-space:nowrap}.stat .a{color:var(--ok)}.stat .d{color:var(--bad)}
+.verdicts{display:flex;gap:4px}
+.verdicts button{font-size:12px;padding:3px 8px}
+.verdicts button.on[data-v=approved]{background:var(--ok);border-color:var(--ok);color:#fff}
+.verdicts button.on[data-v=needs-work]{background:var(--warn);border-color:var(--warn);color:#111}
+.verdicts button.on[data-v=rejected]{background:var(--bad);border-color:var(--bad);color:#fff}
+.card-sub{padding:6px 12px;font-size:12px;color:var(--muted);border-bottom:1px solid var(--line);display:flex;gap:12px;flex-wrap:wrap}
+.card-sub code{background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--text);word-break:break-all}
+.sent{color:var(--ok);font-size:11px;font-weight:600}
+.card-note{padding:8px 12px;border-top:1px solid var(--line)}
+.card-note textarea{min-height:34px;height:34px;font-size:13px}
+.diffwrap{overflow-x:auto}
+table.diff{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:12.5px;line-height:1.5}
+table.diff td{padding:0 8px;vertical-align:top;white-space:pre}
+td.ln{width:1%;min-width:44px;text-align:right;color:var(--muted);user-select:none;cursor:pointer;border-right:1px solid var(--line)}
+td.ln:hover{color:var(--accent);text-decoration:underline}
+td.code{width:auto}
+table.diff.split{table-layout:fixed}
+table.diff.split td.code{white-space:pre-wrap;word-break:break-all}
+td.code .sg{user-select:none;color:var(--muted);display:inline-block;width:14px}
+tr.add td.code,tr.add td.code-r{background:var(--add-bg)}tr.add td.ln{background:var(--add-ln)}
+tr.del td.code{background:var(--del-bg)}tr.del td.ln{background:var(--del-ln)}
+td.c-add{background:var(--add-bg)}td.c-del{background:var(--del-bg)}td.l-add{background:var(--add-ln)}td.l-del{background:var(--del-ln)}td.c-empty{background:var(--gap)}
+mark.ia{background:var(--add-hl);color:inherit;border-radius:2px}mark.id{background:var(--del-hl);color:inherit;border-radius:2px}
+tr.gap td{background:var(--gap);color:var(--info);cursor:pointer;font-size:12px;padding:3px 10px;font-family:system-ui,sans-serif}
+tr.gap td:hover{text-decoration:underline}
+tr.cmt td{white-space:normal;background:var(--panel2);padding:8px 12px;font-family:system-ui,sans-serif;font-size:13px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.cbox{border-left:3px solid var(--accent);padding:4px 10px;margin:2px 0;background:var(--panel);border-radius:4px;display:flex;gap:8px;align-items:flex-start}
+.cbox .txt{flex:1;white-space:pre-wrap}
+.cbox button{font-size:11px;padding:1px 6px}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.notice{padding:14px;color:var(--muted);font-size:13px}
+.composer .body{padding:14px;display:flex;flex-direction:column;gap:10px;flex:1}
+.composer h3{margin:0;font-size:15px}
+.counts{display:flex;gap:6px;flex-wrap:wrap}
+.counts span{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--panel2);border:1px solid var(--line)}
+#prompt{font-family:var(--mono);font-size:12px;min-height:260px;flex:1}
+#general{min-height:70px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.banner{padding:10px 12px;border-radius:8px;font-size:13px;border:1px solid var(--line);background:var(--panel2)}
+.banner.waiting{border-color:var(--accent)}
+.queued{font-size:12px;border:1px dashed var(--line);border-radius:6px;padding:6px 8px;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:8px 16px;border-radius:8px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+@media (max-width:1100px){.layout{grid-template-columns:240px minmax(0,1fr)}.composer{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}.layout{height:auto}html,body{height:auto}}
+@media (max-width:700px){.layout{grid-template-columns:1fr}aside{max-height:40vh}header{flex-wrap:wrap;height:auto;padding:8px 16px}main{padding:12px 16px 60px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>◧ Claude Diff Review</h1>
+  <span id="statePill"></span>
+  <span class="sp"></span>
+  <div class="seg" id="modeSeg"><button data-m="unified" class="on">Unified</button><button data-m="split">Split</button></div>
+  <label class="toggle" title="When on, Claude pauses at the end of each turn that changed files until you send feedback or approve."><input type="checkbox" id="gate"> Hold Claude for review</label>
+  <span class="pill"><span class="dot" id="live"></span><span id="liveTxt">offline</span></span>
+</header>
+<div class="layout">
+  <aside>
+    <div class="sec"><h2>Sessions</h2><div id="sessions"></div></div>
+    <div class="sec"><h2><span>Changed files</span><span id="fileCount"></span></h2><div id="files"></div></div>
+    <div class="sec muted" style="font-size:12px">
+      Shortcuts: <span class="kbd">j</span>/<span class="kbd">k</span> move ·
+      <span class="kbd">a</span> approve · <span class="kbd">n</span> needs work · <span class="kbd">r</span> reject ·
+      click a line number to comment
+    </div>
+  </aside>
+  <main id="main"><div class="empty">Waiting for Claude Code to change something…</div></main>
+  <section class="composer">
+    <div class="body">
+      <div class="row" style="justify-content:space-between"><h3>Feedback to Claude</h3><span class="counts" id="counts"></span></div>
+      <div id="banner"></div>
+      <label class="muted" style="font-size:12px">General notes</label>
+      <textarea id="general" placeholder="Anything Claude should know or do overall…"></textarea>
+      <div class="row" style="justify-content:space-between"><label class="muted" style="font-size:12px">Prompt that will be sent (editable)</label><button id="regen" style="font-size:12px">Regenerate</button></div>
+      <textarea id="prompt" spellcheck="false" placeholder="Approve, reject or comment on changes — the prompt builds itself here."></textarea>
+      <div class="row">
+        <label class="muted" style="font-size:12px">Deliver to</label>
+        <select id="target"><option value="session">this session</option><option value="project">next session in this project</option></select>
+      </div>
+      <div class="row">
+        <button class="primary" id="send">Send to Claude</button>
+        <button id="release" style="display:none">Approve all &amp; let Claude continue</button>
+        <button id="copy">Copy</button>
+      </div>
+      <div id="queued"></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clientId = Math.random().toString(36).slice(2);
+const CTX = 3;
+const st = {
+  sessions: [], sid: null, data: null, changes: [], review: null, view: 'changes', mode: 'unified', file: null,
+  blobs: new Map(), expanded: new Set(), full: new Set(), draft: null, focus: -1, promptDirty: false, config: {}, sig: '',
+};
+try { st.mode = localStorage.getItem('dr.mode') || 'unified'; st.view = localStorage.getItem('dr.view') || 'changes'; } catch {}
+
+// ---------------- API ----------------
+const api = async (method, url, body) => {
+  const r = await fetch(url, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.json();
+};
+async function blob(ref) {
+  if (!ref || !ref.sha) return null;
+  if (!st.blobs.has(ref.sha)) st.blobs.set(ref.sha, fetch('/api/blob/' + ref.sha).then((r) => (r.ok ? r.text() : '')));
+  return st.blobs.get(ref.sha);
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 2200); }
+let saveTimer = null;
+function saveReview() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => { saveTimer = null; try { await api('PUT', `/api/sessions/${encodeURIComponent(st.sid)}/review`, { review: st.review, clientId }); } catch (e) { toast('Save failed: ' + e.message); } }, 300);
+  refreshPrompt();
+}
+
+// ---------------- diff engine (Myers, line based) ----------------
+function splitLines(t) { if (t == null) return []; const a = t.split('\n'); if (a.length && a[a.length - 1] === '') a.pop(); return a; }
+function diffLines(a, b) {
+  let pre = 0; while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre++;
+  let suf = 0; while (suf < a.length - pre && suf < b.length - pre && a[a.length - 1 - suf] === b[b.length - 1 - suf]) suf++;
+  const A = a.slice(pre, a.length - suf), B = b.slice(pre, b.length - suf), N = A.length, M = B.length;
+  const ops = [];
+  for (let i = 0; i < pre; i++) ops.push({ t: '=', a: i, b: i });
+  let mid = [];
+  if (!N || !M) { for (let i = 0; i < N; i++) mid.push({ t: '-', a: i }); for (let j = 0; j < M; j++) mid.push({ t: '+', b: j }); }
+  else {
+    const MAX = N + M, off = MAX + 1, V = new Int32Array(2 * MAX + 3), trace = []; let done = false, D = 0;
+    for (let d = 0; d <= MAX && !done; d++) {
+      trace.push(V.slice(off - d - 1, off + d + 2));
+      if (d > 3000) { trace.length = 0; break; } // pathological: fall back to replace-all
+      for (let k = -d; k <= d; k += 2) {
+        let x = (k === -d || (k !== d && V[off + k - 1] < V[off + k + 1])) ? V[off + k + 1] : V[off + k - 1] + 1, y = x - k;
+        while (x < N && y < M && A[x] === B[y]) { x++; y++; }
+        V[off + k] = x;
+        if (x >= N && y >= M) { done = true; D = d; break; }
+      }
+    }
+    if (!done) { for (let i = 0; i < N; i++) mid.push({ t: '-', a: i }); for (let j = 0; j < M; j++) mid.push({ t: '+', b: j }); }
+    else {
+      let x = N, y = M; const rev = [];
+      for (let d = D; d >= 0; d--) {
+        const Vd = trace[d], g = (k) => Vd[k + d + 1], k = x - y;
+        const pk = (k === -d || (k !== d && g(k - 1) < g(k + 1))) ? k + 1 : k - 1;
+        const px = g(pk), py = px - pk;
+        while (x > px && y > py) { rev.push({ t: '=', a: x - 1, b: y - 1 }); x--; y--; }
+        if (d > 0) rev.push(x === px ? { t: '+', b: y - 1 } : { t: '-', a: x - 1 });
+        x = px; y = py;
+      }
+      mid = rev.reverse();
+    }
+  }
+  for (const o of mid) ops.push({ t: o.t, a: o.a == null ? undefined : o.a + pre, b: o.b == null ? undefined : o.b + pre });
+  for (let i = 0; i < suf; i++) ops.push({ t: '=', a: a.length - suf + i, b: b.length - suf + i });
+  return ops;
+}
+function intraline(o, n) {
+  if (o.length > 600 || n.length > 600) return [esc(o), esc(n)];
+  let p = 0; while (p < o.length && p < n.length && o[p] === n[p]) p++;
+  let s = 0; while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
+  const w = (str, cls) => esc(str.slice(0, p)) + (str.length - s > p ? `<mark class="${cls}">${esc(str.slice(p, str.length - s))}</mark>` : '') + esc(str.slice(str.length - s));
+  if (p + s === 0) return [esc(o), esc(n)];
+  return [w(o, 'id'), w(n, 'ia')];
+}
+
+// Build display rows with line numbers (1-based) and inline highlighting.
+function buildRows(beforeTxt, afterTxt) {
+  const a = splitLines(beforeTxt).map((l) => l.replace(/\r$/, '')), b = splitLines(afterTxt).map((l) => l.replace(/\r$/, ''));
+  const ops = diffLines(a, b);
+  const rows = ops.map((o) => ({ t: o.t, ol: o.a != null ? o.a + 1 : null, nl: o.b != null ? o.b + 1 : null, text: o.t === '+' ? b[o.b] : a[o.a] }));
+  for (let i = 0; i < rows.length;) { // pair runs of -/+ for intraline marks
+    if (rows[i].t !== '-') { i++; continue; }
+    let j = i; while (j < rows.length && rows[j].t === '-') j++;
+    let k = j; while (k < rows.length && rows[k].t === '+') k++;
+    for (let x = 0; x < Math.min(j - i, k - j); x++) { const [h1, h2] = intraline(rows[i + x].text, rows[j + x].text); rows[i + x].html = h1; rows[j + x].html = h2; rows[i + x].pair = rows[j + x]; }
+    i = k;
+  }
+  let add = 0, del = 0; rows.forEach((r) => { if (r.t === '+') add++; else if (r.t === '-') del++; });
+  return { rows, add, del };
+}
+// Mark which rows are visible given context and expanded gaps.
+function segments(rows, key) {
+  if (st.full.has(key)) return [{ type: 'rows', from: 0, to: rows.length }];
+  const show = new Uint8Array(rows.length);
+  rows.forEach((r, i) => { if (r.t !== '=') for (let j = Math.max(0, i - CTX); j <= Math.min(rows.length - 1, i + CTX); j++) show[j] = 1; });
+  const segs = []; let i = 0;
+  while (i < rows.length) {
+    let j = i; const v = show[i];
+    while (j < rows.length && show[j] === v) j++;
+    if (v || st.expanded.has(key + ':' + i) || j - i <= 2) segs.push({ type: 'rows', from: i, to: j });
+    else segs.push({ type: 'gap', from: i, to: j });
+    i = j;
+  }
+  return segs;
+}
+
+// ---------------- rendering ----------------
+const commentsFor = (key) => (st.review?.comments || []).filter((c) => c.anchor.key === key);
+function commentRow(cols, key, side, line) {
+  const list = commentsFor(key).filter((c) => c.anchor.side === side && c.anchor.line === line);
+  const isDraft = st.draft && st.draft.key === key && st.draft.side === side && st.draft.line === line;
+  if (!list.length && !isDraft) return '';
+  let h = list.map((c) => `<div class="cbox"><div class="txt">${esc(c.text)}</div>${c.sent ? '<span class="sent">sent</span>' : ''}<button data-act="delc" data-id="${c.id}">delete</button></div>`).join('');
+  if (isDraft) h += `<div style="margin-top:6px"><textarea class="draft" rows="3" placeholder="Comment on ${side === 'new' ? 'new' : 'old'} line ${line}…  (⌘/Ctrl+Enter to save)"></textarea><div class="row" style="margin-top:6px"><button class="primary" data-act="savec">Add comment</button><button data-act="cancelc">Cancel</button></div></div>`;
+  return `<tr class="cmt"><td colspan="${cols}">${h}</td></tr>`;
+}
+function renderDiffTable(rows, key) {
+  const segs = segments(rows, key), split = st.mode === 'split', cols = split ? 4 : 3;
+  let h = split ? `<table class="diff split"><colgroup><col style="width:52px"><col><col style="width:52px"><col></colgroup>` : `<table class="diff">`;
+  const gap = (s) => `<tr class="gap" data-act="expand" data-gap="${key}:${s.from}"><td colspan="${cols}">⋯ Show ${s.to - s.from} unchanged lines</td></tr>`;
+  if (!split) {
+    for (const s of segs) {
+      if (s.type === 'gap') { h += gap(s); continue; }
+      for (let i = s.from; i < s.to; i++) {
+        const r = rows[i], cls = r.t === '+' ? 'add' : r.t === '-' ? 'del' : '';
+        const side = r.t === '-' ? 'old' : 'new', line = r.t === '-' ? r.ol : r.nl;
+        h += `<tr class="${cls}"><td class="ln" data-act="cmt" data-side="old" data-line="${r.ol ?? ''}">${r.ol ?? ''}</td><td class="ln" data-act="cmt" data-side="new" data-line="${r.nl ?? ''}">${r.nl ?? ''}</td><td class="code"><span class="sg">${r.t === '=' ? ' ' : r.t}</span>${r.html ?? esc(r.text)}</td></tr>`;
+        h += commentRow(cols, key, side, line);
+        if (r.t === '=') h += commentRow(cols, key, 'old', r.ol);
+      }
+    }
+  } else {
+    for (const s of segs) {
+      if (s.type === 'gap') { h += gap(s); continue; }
+      for (let i = s.from; i < s.to;) {
+        const r = rows[i];
+        if (r.t === '=') {
+          h += `<tr><td class="ln" data-act="cmt" data-side="old" data-line="${r.ol}">${r.ol}</td><td class="code">${esc(r.text)}</td><td class="ln" data-act="cmt" data-side="new" data-line="${r.nl}">${r.nl}</td><td class="code">${esc(r.text)}</td></tr>`;
+          h += commentRow(cols, key, 'new', r.nl) + commentRow(cols, key, 'old', r.ol); i++; continue;
+        }
+        let j = i; while (j < s.to && rows[j].t === '-') j++;
+        let k = j; while (k < s.to && rows[k].t === '+') k++;
+        const L = rows.slice(i, j), R = rows.slice(j, k), n = Math.max(L.length, R.length);
+        for (let x = 0; x < n; x++) {
+          const l = L[x], rr = R[x];
+          h += '<tr>' + (l ? `<td class="ln l-del" data-act="cmt" data-side="old" data-line="${l.ol}">${l.ol}</td><td class="code c-del">${l.html ?? esc(l.text)}</td>` : '<td class="ln c-empty"></td><td class="code c-empty"></td>')
+            + (rr ? `<td class="ln l-add" data-act="cmt" data-side="new" data-line="${rr.nl}">${rr.nl}</td><td class="code c-add">${rr.html ?? esc(rr.text)}</td>` : '<td class="ln c-empty"></td><td class="code c-empty"></td>') + '</tr>';
+          if (l) h += commentRow(cols, key, 'old', l.ol);
+          if (rr) h += commentRow(cols, key, 'new', rr.nl);
+        }
+        i = k === i ? i + 1 : k;
+      }
+    }
+  }
+  return h + '</table>';
+}
+function pathHTML(f) { const i = f.lastIndexOf('/') + 1 || f.lastIndexOf('\\') + 1; return `<span class="dir">${esc(f.slice(0, i))}</span><b>${esc(f.slice(i))}</b>`; }
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const ago = (ts) => { const s = (Date.now() - ts) / 1000; return s < 60 ? 'just now' : s < 3600 ? `${Math.floor(s / 60)}m ago` : s < 86400 ? `${Math.floor(s / 3600)}h ago` : new Date(ts).toLocaleDateString(); };
+const base = (p) => (p || '').split(/[\\/]/).filter(Boolean).pop() || p || '(unknown)';
+
+function units() { // the list of reviewable units for the current view
+  const ch = st.changes.filter((c) => !st.file || c.file === st.file);
+  if (st.view === 'changes') return ch.map((c) => ({ kind: 'change', key: 'c:' + c.id, changes: [c], file: c.file }));
+  const by = new Map();
+  for (const c of ch) { if (!by.has(c.file)) by.set(c.file, []); by.get(c.file).push(c); }
+  return [...by.entries()].map(([file, cs]) => ({ kind: 'file', key: 'f:' + file, changes: cs, file }));
+}
+function unitVerdict(u) { const vs = new Set(u.changes.map((c) => st.review.verdicts[c.id] || '')); return vs.size === 1 ? [...vs][0] : vs.has('rejected') ? 'rejected' : vs.has('needs-work') ? 'needs-work' : ''; }
+
+function renderMain() {
+  const main = $('#main');
+  if (!st.sid || !st.data) { main.innerHTML = '<div class="empty">No session selected. Changes appear here as soon as Claude Code edits a file.</div>'; return; }
+  const us = units();
+  let h = `<div class="tabs"><button class="tab ${st.view === 'changes' ? 'on' : ''}" data-act="view" data-v="changes">Every change (${st.changes.length})</button><button class="tab ${st.view === 'files' ? 'on' : ''}" data-act="view" data-v="files">By file (${new Set(st.changes.map((c) => c.file)).size})</button>`;
+  if (st.file) h += `<span class="chip"><span title="${esc(st.file)}">${esc(st.file)}</span><button data-act="clearfile">✕</button></span>`;
+  h += `<span class="sp" style="flex:1"></span><button data-act="approveall" style="font-size:12px">Approve all unreviewed</button></div>`;
+  if (!us.length) h += '<div class="empty">No changes recorded for this session yet.</div>';
+  us.forEach((u, idx) => {
+    const v = unitVerdict(u), c0 = u.changes[0], cl = u.changes[u.changes.length - 1];
+    const sent = u.changes.every((c) => st.review.sent[c.id]) && v;
+    h += `<div class="card ${v ? 'v-' + v : ''} ${idx === st.focus ? 'focus' : ''}" data-key="${esc(u.key)}" data-idx="${idx}">
+      <div class="card-h">${u.kind === 'change' ? `<span class="seq">#${c0.seq}</span><span class="tool ${c0.tool}">${c0.tool}</span>` : `<span class="tool">${u.changes.length} change${u.changes.length > 1 ? 's' : ''}</span>`}
+        <span class="path" title="${esc(u.file)}">${pathHTML(u.file)}</span><span class="stat" data-stat></span>
+        <span class="muted" style="font-size:12px">${fmtTime(cl.ts)}</span>${sent ? '<span class="sent">✓ sent</span>' : ''}
+        <div class="verdicts">${[['approved', '✓ Approve'], ['needs-work', '✎ Needs work'], ['rejected', '✕ Reject']].map(([k, l]) => `<button data-act="verdict" data-v="${k}" class="${v === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      ${subline(u)}
+      <div class="diffwrap" data-diff><div class="notice">Loading diff…</div></div>
+      ${u.kind === 'change' ? `<div class="card-note"><textarea data-note="${c0.id}" placeholder="Note to Claude about this change (optional)…">${esc(st.review.notes[c0.id] || '')}</textarea></div>` : ''}
+    </div>`;
+  });
+  main.innerHTML = h;
+  observeCards();
+}
+function subline(u) {
+  const bits = [], c0 = u.changes[0], cl = u.changes[u.changes.length - 1];
+  if (u.kind === 'file') bits.push(`Changes ${u.changes.map((c) => '#' + c.seq).join(', ')} combined: before #${c0.seq} → after #${cl.seq}`);
+  if (u.kind === 'change' && c0.tool === 'Bash' && c0.meta?.command) bits.push(`via <code>${esc(c0.meta.command.length > 300 ? c0.meta.command.slice(0, 300) + '…' : c0.meta.command)}</code>`);
+  if (c0.before == null && !c0.beforeUnknown) bits.push('new file');
+  if (cl.after == null) bits.push('deleted');
+  if (u.changes.some((c) => c.beforeUnknown)) bits.push('⚠ original content was not captured');
+  if (c0.meta?.replaceAll) bits.push('replace_all');
+  bits.push(`<a href="#" data-act="full">${st.full.has(u.key) ? 'Collapse unchanged' : 'Show full file'}</a>`, `<a href="#" data-act="copypath">Copy path</a>`);
+  return `<div class="card-sub">${bits.join('<span>·</span>')}</div>`;
+}
+let io;
+function observeCards() {
+  io?.disconnect();
+  io = new IntersectionObserver((ents) => ents.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); fillCard(e.target); } }), { rootMargin: '600px' });
+  document.querySelectorAll('.card').forEach((c) => io.observe(c));
+}
+async function fillCard(card) {
+  const key = card.dataset.key, u = units().find((x) => x.key === key);
+  if (!u) return;
+  const c0 = u.changes[0], cl = u.changes[u.changes.length - 1];
+  const target = card.querySelector('[data-diff]');
+  for (const ref of [c0.before, cl.after]) if (ref && (ref.binary || ref.tooLarge)) { target.innerHTML = `<div class="notice">${ref.binary ? 'Binary file' : 'File too large to diff'} (${ref.size} bytes)</div>`; return; }
+  const [b, a] = await Promise.all([blob(c0.before), blob(cl.after)]);
+  const { rows, add, del } = buildRows(b, a);
+  card.querySelector('[data-stat]').innerHTML = `<span class="a">+${add}</span> <span class="d">−${del}</span>`;
+  card._rows = rows;
+  target.innerHTML = rows.length ? renderDiffTable(rows, key) : '<div class="notice">Empty file</div>';
+  const d = target.querySelector('textarea.draft'); if (d) d.focus();
+}
+const rerenderCard = (key) => { const c = document.querySelector(`.card[data-key="${CSS.escape(key)}"]`); if (c) fillCard(c); };
+
+function renderSidebar() {
+  $('#sessions').innerHTML = st.sessions.length ? st.sessions.map((s) => `<div class="sess ${s.id === st.sid ? 'on' : ''}" data-sid="${esc(s.id)}">
+      <div class="t"><span>${esc(base(s.cwd))}</span>${s.waiting ? '<span class="pill waiting">review</span>' : s.queued ? `<span class="pill">${s.queued} queued</span>` : ''}</div>
+      <div class="p" title="${esc(s.cwd || '')}">${esc(s.cwd || s.id)}</div>
+      <div class="muted" style="font-size:11px">${s.changeCount} changes · ${s.files} files · ${ago(s.lastTs || s.lastChangeTs)}</div></div>`).join('')
+    : '<div class="muted" style="font-size:13px">No sessions with changes yet.</div>';
+  const files = new Map();
+  for (const c of st.changes) { if (!files.has(c.file)) files.set(c.file, []); files.get(c.file).push(c); }
+  $('#fileCount').textContent = files.size || '';
+  $('#files').innerHTML = [...files.entries()].map(([f, cs]) => {
+    const v = unitVerdict({ changes: cs });
+    return `<div class="file ${st.file === f ? 'on' : ''}" data-file="${esc(f)}" title="${esc(f)}"><span class="st-dot ${v ? 'st-' + v : ''}"></span><span>${esc(f)}</span><span class="n">${cs.length}</span></div>`;
+  }).join('') || '<div class="muted" style="font-size:13px">—</div>';
+}
+function renderHeader() {
+  const s = st.data?.state || {};
+  const pill = $('#statePill');
+  if (!st.sid) pill.innerHTML = '';
+  else if (s.waiting) pill.innerHTML = '<span class="pill waiting">● Claude is waiting for your review</span>';
+  else if (s.state === 'working') pill.innerHTML = '<span class="pill working">● Claude is working</span>';
+  else pill.innerHTML = '<span class="pill">Claude is idle</span>';
+  $('#gate').checked = !!st.config.gate;
+  document.querySelectorAll('#modeSeg button').forEach((b) => b.classList.toggle('on', b.dataset.m === st.mode));
+}
+function renderComposer() {
+  if (!st.review) return;
+  const R = st.review, cs = st.changes;
+  const n = (v) => cs.filter((c) => R.verdicts[c.id] === v).length;
+  const unrev = cs.filter((c) => !R.verdicts[c.id]).length;
+  $('#counts').innerHTML = `<span>✓ ${n('approved')}</span><span>✎ ${n('needs-work')}</span><span>✕ ${n('rejected')}</span><span>💬 ${R.comments.filter((c) => !c.sent).length}</span><span>${unrev} unreviewed</span>`;
+  if (document.activeElement !== $('#general')) $('#general').value = R.general || '';
+  const s = st.data.state || {};
+  $('#release').style.display = s.waiting ? '' : 'none';
+  $('#banner').innerHTML = s.waiting
+    ? '<div class="banner waiting"><b>Claude is paused for your review.</b> “Send to Claude” delivers your feedback instantly and Claude starts working on it.</div>'
+    : s.state === 'working'
+      ? '<div class="banner">Claude is mid-turn. Feedback is delivered the moment it finishes this turn.</div>'
+      : '<div class="banner">Claude is idle. Feedback is delivered with your next message in Claude Code — even typing “go” works. Turn on <b>Hold Claude for review</b> to have Claude wait for you automatically.</div>';
+  $('#queued').innerHTML = (st.data.queued || []).map((q) => `<div class="queued"><span>⏳ Queued ${ago(q.createdAt)} — waiting for Claude to pick it up</span><button data-act="cancelq" data-id="${q.id}">Cancel</button></div>`).join('');
+}
+
+// ---------------- feedback prompt ----------------
+function hunkText(rows, max = 40) {
+  const out = []; let last = -10;
+  rows.forEach((r, i) => {
+    if (r.t === '=') return;
+    if (out.length >= max) return;
+    if (i - last > 1 && out.length) out.push('@@');
+    for (let j = Math.max(last + 1, i - 1); j < i; j++) if (rows[j].t === '=') out.push('  ' + rows[j].text);
+    out.push(r.t + ' ' + r.text); last = i;
+  });
+  if (rows.filter((r) => r.t !== '=').length > max) out.push(`… (${rows.filter((r) => r.t !== '=').length - max} more changed lines)`);
+  return out.join('\n');
+}
+async function changeRows(c) { const [b, a] = await Promise.all([blob(c.before), blob(c.after)]); return buildRows(b, a).rows; }
+async function buildPrompt() {
+  const R = st.review, cs = st.changes, byId = Object.fromEntries(cs.map((c) => [c.id, c]));
+  const unsent = cs.filter((c) => !R.sent[c.id]);
+  const rejected = unsent.filter((c) => R.verdicts[c.id] === 'rejected');
+  const needs = unsent.filter((c) => R.verdicts[c.id] === 'needs-work');
+  const approved = unsent.filter((c) => R.verdicts[c.id] === 'approved');
+  const noted = unsent.filter((c) => !['rejected', 'needs-work'].includes(R.verdicts[c.id]) && (R.notes[c.id] || '').trim());
+  const comments = R.comments.filter((c) => !c.sent);
+  const general = (R.general || '').trim();
+  if (!rejected.length && !needs.length && !noted.length && !comments.length && !general) return approved.length ? `[diff-review] The user reviewed and approved changes ${approved.map((c) => '#' + c.seq).join(', ')}. No changes requested — continue.` : '';
+  const L = ['[diff-review] The user reviewed the file changes you made in this session. All paths are absolute. Address every item below, then briefly summarize what you did for each one.', ''];
+  const section = async (title, list) => {
+    if (!list.length) return;
+    L.push(`## ${title}`);
+    for (const c of list) {
+      L.push(`### ${c.file}  (change #${c.seq}, ${c.tool} at ${fmtTime(c.ts)})`);
+      if ((R.notes[c.id] || '').trim()) L.push(`Reviewer note: ${R.notes[c.id].trim()}`);
+      const ref = c.before?.binary || c.after?.binary || c.before?.tooLarge || c.after?.tooLarge;
+      if (!ref) L.push('Your change:', '```diff', hunkText(await changeRows(c)), '```');
+      L.push('');
+    }
+  };
+  await section('Rejected — revert or redo these changes', rejected);
+  await section('Needs work — revise these changes', needs);
+  if (noted.length) { L.push('## Notes on specific changes'); noted.forEach((c) => L.push(`- ${c.file} (change #${c.seq}): ${R.notes[c.id].trim()}`)); L.push(''); }
+  if (comments.length) {
+    L.push('## Line comments');
+    const byFile = new Map();
+    comments.forEach((c) => { if (!byFile.has(c.anchor.file)) byFile.set(c.anchor.file, []); byFile.get(c.anchor.file).push(c); });
+    for (const [f, list] of byFile) {
+      L.push(`### ${f}`);
+      list.sort((x, y) => x.anchor.line - y.anchor.line).forEach((c) => {
+        const ch = c.anchor.changeId && byId[c.anchor.changeId];
+        const where = c.anchor.side === 'new' ? `line ${c.anchor.line}` : `removed line ${c.anchor.line} (old numbering)`;
+        L.push(`- ${where}${ch ? ` in change #${ch.seq}` : ''}: \`${(c.code || '').trim().slice(0, 200)}\``, `  ${c.text.trim().replace(/\n/g, '\n  ')}`);
+      });
+      L.push('');
+    }
+  }
+  if (general) L.push('## General notes', general, '');
+  if (approved.length) L.push(`## Approved`, `Changes ${approved.map((c) => '#' + c.seq).join(', ')} are approved — keep them as they are.`);
+  return L.join('\n').trim();
+}
+let regenSeq = 0;
+async function refreshPrompt(force) {
+  if (st.promptDirty && !force) return;
+  const my = ++regenSeq, txt = await buildPrompt();
+  if (my !== regenSeq) return;
+  $('#prompt').value = txt; st.promptDirty = false;
+  renderComposer();
+}
+
+// ---------------- loading ----------------
+async function loadSessions() { st.sessions = await api('GET', '/api/sessions'); }
+async function loadSession(keepReview) {
+  if (!st.sid) { st.data = null; st.changes = []; st.review = null; return; }
+  const d = await api('GET', '/api/sessions/' + encodeURIComponent(st.sid));
+  const changed = d.changes.map((c) => c.id).join() !== st.changes.map((c) => c.id).join();
+  st.data = d; st.changes = d.changes;
+  if (!keepReview || !st.review) st.review = Object.assign({ verdicts: {}, notes: {}, comments: [], general: '', sent: {} }, d.review);
+  return changed;
+}
+async function selectSession(sid) {
+  st.sid = sid; st.file = null; st.focus = -1; st.draft = null; st.promptDirty = false;
+  if (location.hash !== '#/s/' + encodeURIComponent(sid)) history.replaceState(null, '', '#/s/' + encodeURIComponent(sid));
+  await loadSession(false); renderAll(); refreshPrompt(true);
+}
+function renderAll() { renderHeader(); renderSidebar(); renderMain(); renderComposer(); }
+async function refresh(ev) {
+  try {
+    st.config = await api('GET', '/api/config');
+    await loadSessions();
+    if (!st.sid && st.sessions.length) return selectSession(st.sessions[0].id);
+    const selfWrite = ev && ev.by === clientId;
+    const editing = saveTimer || (document.activeElement && document.activeElement.tagName === 'TEXTAREA');
+    const changed = await loadSession(selfWrite || editing);
+    renderHeader(); renderSidebar(); renderComposer();
+    if (changed || !(selfWrite || editing)) { renderMain(); refreshPrompt(); }
+  } catch (e) { console.error(e); }
+}
+
+// ---------------- interactions ----------------
+function setVerdict(u, v) {
+  const cur = unitVerdict(u);
+  for (const c of u.changes) { if (cur === v) delete st.review.verdicts[c.id]; else st.review.verdicts[c.id] = v; delete st.review.sent[c.id]; }
+  saveReview(); renderMain(); renderSidebar();
+}
+document.addEventListener('click', async (e) => {
+  const el = e.target.closest('[data-act],[data-sid],[data-file],#modeSeg button');
+  if (!el) return;
+  const card = el.closest('.card'), key = card?.dataset.key, u = key && units().find((x) => x.key === key);
+  if (el.dataset.sid) return selectSession(el.dataset.sid);
+  if (el.dataset.file) { st.file = st.file === el.dataset.file ? null : el.dataset.file; st.focus = -1; renderSidebar(); return renderMain(); }
+  if (el.dataset.m) { st.mode = el.dataset.m; try { localStorage.setItem('dr.mode', st.mode); } catch {} renderHeader(); return renderMain(); }
+  switch (el.dataset.act) {
+    case 'view': st.view = el.dataset.v; st.focus = -1; try { localStorage.setItem('dr.view', st.view); } catch {} return renderMain();
+    case 'clearfile': st.file = null; renderSidebar(); return renderMain();
+    case 'verdict': return setVerdict(u, el.dataset.v);
+    case 'approveall': st.changes.forEach((c) => { if (!st.review.verdicts[c.id]) st.review.verdicts[c.id] = 'approved'; }); saveReview(); renderMain(); return renderSidebar();
+    case 'expand': st.expanded.add(el.dataset.gap); return rerenderCard(key);
+    case 'full': e.preventDefault(); st.full.has(key) ? st.full.delete(key) : st.full.add(key); card.querySelector('.card-sub').outerHTML = subline(u); return rerenderCard(key);
+    case 'copypath': e.preventDefault(); navigator.clipboard?.writeText(u.file); return toast('Copied ' + u.file);
+    case 'cmt': {
+      const line = Number(el.dataset.line); if (!line) return;
+      const r = (card._rows || []).find((x) => (el.dataset.side === 'new' ? x.nl : x.ol) === line && (el.dataset.side === 'new' ? x.t !== '-' : x.t !== '+'));
+      st.draft = { key, side: el.dataset.side, line, code: r ? r.text : '', file: u.file, changeId: u.kind === 'change' ? u.changes[0].id : null };
+      return rerenderCard(key);
+    }
+    case 'cancelc': st.draft = null; return rerenderCard(key);
+    case 'savec': return saveDraft(card);
+    case 'delc': st.review.comments = st.review.comments.filter((c) => c.id !== el.dataset.id); saveReview(); return rerenderCard(key);
+    case 'cancelq': await api('DELETE', '/api/feedback/' + el.dataset.id); toast('Cancelled'); return refresh();
+  }
+});
+function saveDraft(card) {
+  const ta = card.querySelector('textarea.draft'), text = ta?.value.trim();
+  if (!text) return;
+  const d = st.draft;
+  st.review.comments.push({ id: Math.random().toString(36).slice(2), anchor: { key: d.key, file: d.file, side: d.side, line: d.line, changeId: d.changeId }, code: d.code, text, ts: Date.now(), sent: false });
+  st.draft = null; saveReview(); rerenderCard(d.key);
+}
+document.addEventListener('keydown', (e) => {
+  if (e.target.matches('textarea.draft') && e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); return saveDraft(e.target.closest('.card')); }
+  if (e.target.matches('textarea.draft') && e.key === 'Escape') { const k = st.draft?.key; st.draft = null; return k && rerenderCard(k); }
+  if (e.target.closest('textarea,input,select') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const us = units();
+  if (e.key === 'j' || e.key === 'k') {
+    st.focus = Math.max(0, Math.min(us.length - 1, st.focus + (e.key === 'j' ? 1 : -1)));
+    document.querySelectorAll('.card').forEach((c) => c.classList.toggle('focus', Number(c.dataset.idx) === st.focus));
+    document.querySelector(`.card[data-idx="${st.focus}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  const map = { a: 'approved', n: 'needs-work', r: 'rejected' };
+  if (map[e.key] && us[st.focus]) setVerdict(us[st.focus], map[e.key]);
+});
+document.addEventListener('input', (e) => {
+  if (e.target.dataset.note) { st.review.notes[e.target.dataset.note] = e.target.value; delete st.review.sent[e.target.dataset.note]; saveReview(); }
+  if (e.target.id === 'general') { st.review.general = e.target.value; saveReview(); }
+  if (e.target.id === 'prompt') st.promptDirty = true;
+});
+$('#regen').onclick = () => refreshPrompt(true);
+$('#gate').onchange = async (e) => { st.config = await api('PUT', '/api/config', { gate: e.target.checked }); toast(st.config.gate ? 'Claude will pause for review after each turn that changes files' : 'Review gate off'); };
+$('#copy').onclick = () => { navigator.clipboard?.writeText($('#prompt').value); toast('Copied prompt'); };
+$('#release').onclick = async () => {
+  st.changes.forEach((c) => { if (!st.review.verdicts[c.id]) st.review.verdicts[c.id] = 'approved'; });
+  saveReview(); await api('POST', `/api/sessions/${encodeURIComponent(st.sid)}/release`); toast('Claude released'); refresh();
+};
+$('#send').onclick = async () => {
+  const text = $('#prompt').value.trim();
+  if (!text) return toast('Nothing to send yet — approve, reject or comment first');
+  await api('POST', `/api/sessions/${encodeURIComponent(st.sid)}/feedback`, { text, target: $('#target').value });
+  const R = st.review;
+  st.changes.forEach((c) => { if (R.verdicts[c.id] || (R.notes[c.id] || '').trim()) R.sent[c.id] = true; });
+  R.comments.forEach((c) => (c.sent = true));
+  R.general = '';
+  (R.log = R.log || []).push({ ts: Date.now(), text });
+  st.promptDirty = false;
+  saveReview(); toast(st.data.state.waiting ? 'Sent — Claude is on it' : 'Queued — Claude will receive it next'); renderMain(); refresh();
+};
+
+// ---------------- live updates ----------------
+function connect() {
+  const es = new EventSource('/api/events');
+  es.onopen = () => { $('#live').classList.add('on'); $('#liveTxt').textContent = 'live'; };
+  es.onmessage = (m) => { let d = {}; try { d = JSON.parse(m.data); } catch {} refresh(d); };
+  es.onerror = () => { $('#live').classList.remove('on'); $('#liveTxt').textContent = 'reconnecting'; };
+}
+(async () => {
+  const m = location.hash.match(/^#\/s\/(.+)$/);
+  st.config = await api('GET', '/api/config').catch(() => ({}));
+  await loadSessions().catch(() => {});
+  if (m) await selectSession(decodeURIComponent(m[1]));
+  else if (st.sessions[0]) await selectSession(st.sessions[0].id);
+  else renderAll();
+  connect();
+  setInterval(() => { renderSidebar(); }, 30000);
+})();
+</script>
+</body>
+</html>
